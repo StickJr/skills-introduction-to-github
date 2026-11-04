@@ -1,0 +1,499 @@
+<title>PC Builder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one-screen workbench. Phone = stacked (case view, info, parts tray); wide = case left, panel right.
+   Deliberately single dark theme, like a lit-up PC on a dark desk. */
+:root {
+  --bg: #0c0f13;
+  --panel: #151a20;
+  --raise: #1d242c;
+  --line: #2a333d;
+  --fg: #e6ebef;
+  --muted: #8a96a2;
+  --accent: #4fd1e8;
+  --ok: #5ad48a;
+  --warn: #f0a24b;
+  --sel: #ffd84d;
+  --display: "Saira Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 15px/1.45 var(--body);
+  -webkit-tap-highlight-color: transparent;
+}
+.app {
+  height: 100%; box-sizing: border-box;
+  display: grid; gap: 10px;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas: "head" "scene" "status" "info" "tray";
+  padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  max-width: 1100px; margin: 0 auto;
+}
+@media (min-width: 820px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr) 380px;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "head head" "scene info" "scene status" "tray tray";
+    padding-block: 20px; column-gap: 24px;
+  }
+  .info { align-self: start; }
+}
+
+/* Header */
+header { grid-area: head; display: grid; gap: 8px; }
+.head-row { display: flex; align-items: center; gap: 8px; }
+.head-row .titles { flex: 1; min-width: 0; }
+h1 { margin: 0; font: 700 26px/1 var(--display); letter-spacing: .01em; }
+.meta { font: 500 12px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; margin-top: 4px; }
+.btn {
+  font: 600 13px/1 var(--body); color: var(--fg);
+  background: var(--raise); border: 1px solid var(--line); border-radius: 10px;
+  padding: 9px 11px; cursor: pointer; white-space: nowrap;
+}
+.btn:hover { border-color: var(--muted); }
+.btn:focus-visible, .card:focus-visible, .power:focus-visible { outline: 2px solid var(--sel); outline-offset: 2px; }
+.power {
+  width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--raise); border: 1px solid var(--line); color: var(--muted); cursor: pointer;
+}
+.power.ready { color: var(--fg); border-color: var(--muted); }
+.power.on { color: var(--ok); border-color: var(--ok); box-shadow: 0 0 14px color-mix(in srgb, var(--ok) 55%, transparent); }
+.bar { height: 4px; background: var(--raise); border-radius: 2px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s ease; }
+
+/* Scene */
+.scene { grid-area: scene; min-height: 220px; position: relative; }
+.scene svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.part { transform-box: fill-box; transform-origin: center; cursor: pointer; }
+.part.enter { animation: drop .45s cubic-bezier(.2, 1.3, .4, 1) both; }
+.part.leave { animation: lift .32s ease-in forwards; pointer-events: none; }
+.part[data-part="cables"] { pointer-events: none; }
+@keyframes drop { from { opacity: 0; transform: scale(1.25); } }
+@keyframes lift { to { opacity: 0; transform: translateY(-34px); } }
+.ghost { cursor: pointer; }
+.ghost rect { fill: rgba(255, 255, 255, .04); stroke: rgba(255, 255, 255, .45); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.ghost.hl rect { fill: rgba(255, 216, 77, .12); stroke: var(--sel); }
+.ghost text { fill: rgba(255, 255, 255, .75); font: 600 11px var(--body); }
+.ghost:hover rect { fill: rgba(255, 255, 255, .1); }
+.selbox { fill: none; stroke: var(--sel); stroke-width: 2; pointer-events: none; }
+
+/* Fans and lights */
+.blades { transform-box: fill-box; transform-origin: center; }
+.blades ellipse { fill: #79828c; }
+.ring { stroke: #59626c; }
+.led { fill: #59626c; }
+.rgb { fill: #59626c; }
+.on .blades { animation: spin .55s linear infinite; }
+.on .ring { stroke: currentColor; filter: drop-shadow(0 0 2px currentColor); }
+.on .led { fill: var(--ok); filter: drop-shadow(0 0 3px var(--ok)); }
+.on .rgb { fill: url(#rgb); filter: drop-shadow(0 0 3px #b06cff); }
+.on .shell { stroke: var(--accent); filter: drop-shadow(0 0 6px var(--accent)); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .on .blades { animation-duration: 6s; }
+  .part.enter, .part.leave { animation-duration: .01s; }
+}
+
+/* Status */
+.status { grid-area: status; margin: 0; text-align: center; color: var(--muted); font-size: 13px; min-height: 2.9em; text-wrap: balance; }
+@media (min-width: 820px) { .status { text-align: left; } }
+
+/* Info panel */
+.info { grid-area: info; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; min-width: 0; }
+.info-top { display: flex; align-items: center; gap: 10px; }
+.info-top .ico { width: 30px; height: 30px; flex: none; }
+.info-top .txt { flex: 1; min-width: 0; }
+.info h2 { margin: 0; font: 700 19px/1.15 var(--display); letter-spacing: .01em; }
+.state { font: 500 12px/1.3 var(--mono); margin-top: 2px; }
+.info .scroll { max-height: 128px; overflow-y: auto; display: grid; gap: 8px; }
+.info p { margin: 0; font-size: 14px; max-width: 65ch; }
+.tip { display: flex; gap: 8px; font-size: 13px; color: #e9cf7c; }
+.tip b { font: 600 10px/1.9 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--sel); flex: none; }
+@media (min-width: 820px) { .info .scroll { max-height: none; } }
+.act { border: 0; border-radius: 10px; padding: 10px 14px; font: 600 14px/1 var(--body); cursor: pointer; flex: none; }
+.act.install { background: var(--accent); color: #062026; }
+.act.install.locked { background: var(--raise); color: var(--muted); border: 1px solid var(--line); }
+.act.remove { background: transparent; color: #ff8a80; border: 1px solid #6b3330; }
+
+/* Parts tray */
+.tray { grid-area: tray; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.tray::-webkit-scrollbar { display: none; }
+.card {
+  flex: none; width: 74px; display: grid; justify-items: center; gap: 4px;
+  padding: 9px 4px 8px; border-radius: 12px; position: relative;
+  background: var(--panel); border: 1px solid var(--line); color: var(--muted); cursor: pointer;
+  font: 600 11.5px/1.1 var(--body);
+}
+@media (min-width: 820px) { .tray { justify-content: center; flex-wrap: wrap; } .card { width: 88px; } }
+.card svg { width: 30px; height: 30px; }
+.card.avail { color: var(--fg); }
+.card.done { color: var(--tint); }
+.card[aria-pressed="true"] { border-color: var(--sel); background: var(--raise); }
+.card .badge { position: absolute; top: 5px; right: 6px; width: 14px; height: 14px; }
+</style>
+
+<div class="app">
+  <header>
+    <div class="head-row">
+      <div class="titles">
+        <h1>PC Builder</h1>
+        <div class="meta" id="meta">0/9 parts · ≈0 W</div>
+      </div>
+      <button class="btn" id="buildAll" type="button">Build all</button>
+      <button class="btn" id="takeApart" type="button">Take apart</button>
+      <button class="power" id="power" type="button" aria-label="Power on">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>
+      </button>
+    </div>
+    <div class="bar"><i id="progress"></i></div>
+  </header>
+
+  <div class="scene">
+    <svg id="scene" viewBox="-4 -4 328 408" role="img" aria-label="Side view of the PC case">
+      <defs>
+        <linearGradient id="rgb" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ff5fa2"/><stop offset=".4" stop-color="#b06cff"/>
+          <stop offset=".7" stop-color="#5b8cff"/><stop offset="1" stop-color="#4fd1e8"/>
+        </linearGradient>
+        <linearGradient id="cpuMetal" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#d9dde1"/><stop offset="1" stop-color="#9aa1a8"/>
+        </linearGradient>
+      </defs>
+      <g id="parts"></g>
+      <g id="ghosts"></g>
+      <g id="sel"></g>
+    </svg>
+  </div>
+
+  <p class="status" id="status" aria-live="polite"></p>
+
+  <section class="info" id="info" aria-live="polite"></section>
+
+  <nav class="tray" id="tray" aria-label="Parts"></nav>
+</div>
+
+<script>
+// ---------- Parts ----------
+const PARTS = [
+  { id: "case", name: "Case", short: "Case", tint: "#a7b2bd", req: [], w: 10, L: [0, 0, 320, 400], layer: 0,
+    sum: "The chassis that holds and protects everything. Its size (ATX, Micro-ATX, Mini-ITX) decides which motherboards fit, and its fans pull cool air in at the front and push hot air out the back.",
+    tip: "Check the maximum GPU length and cooler height before buying a case." },
+  { id: "psu", name: "Power Supply", short: "PSU", tint: "#f2cf3d", req: ["case"], w: 0, L: [24, 314, 150, 66], layer: 1,
+    sum: "Turns AC power from the wall into the steady 12 V, 5 V and 3.3 V DC the parts need. It's rated in watts and in efficiency (80 Plus Bronze up to Titanium).",
+    tip: "Leave 30–40% headroom above your peak power draw. Most gaming PCs use a 650–850 W unit." },
+  { id: "mobo", name: "Motherboard", short: "Motherboard", tint: "#5ad48a", req: ["case"], w: 50, L: [24, 28, 196, 250], layer: 1,
+    sum: "The main circuit board. Every part connects through it: the CPU socket, RAM slots, PCIe slot for the graphics card, M.2 slots for SSDs and the rear USB and network ports.",
+    tip: "The CPU socket (for example AM5 or LGA 1851) must match your processor. Screw the board onto the standoffs in the case." },
+  { id: "cpu", name: "Processor (CPU)", short: "CPU", tint: "#5b8cff", req: ["mobo"], w: 125, L: [92, 70, 48, 48], layer: 2,
+    sum: "The processor is the brain. In games it runs the game logic, physics and AI, and tells the graphics card what to draw. More fast cores help with streaming and multitasking.",
+    tip: "Line up the small gold triangle on the CPU with the mark on the socket. Never force it in." },
+  { id: "cooler", name: "CPU Cooler", short: "Cooler", tint: "#4fd1e8", req: ["cpu"], w: 5, L: [78, 56, 76, 76], layer: 4,
+    sum: "A CPU can make over 100 W of heat. The cooler moves it away with a metal heatsink and fan (air cooling) or a pump and radiator (liquid cooling).",
+    tip: "Put a pea-sized dot of thermal paste on the CPU first. The cooler's pressure spreads it." },
+  { id: "ram", name: "Memory (RAM)", short: "RAM", tint: "#b06cff", req: ["mobo"], w: 10, L: [172, 52, 32, 104], layer: 2,
+    sum: "Fast short-term memory that holds what the CPU is working on right now. It's wiped when the PC turns off. 32 GB of DDR5 is a common gaming sweet spot.",
+    tip: "With two sticks, use slots A2 and B2 (usually the 2nd and 4th from the CPU), then turn on XMP or EXPO in the BIOS." },
+  { id: "ssd", name: "Storage (SSD)", short: "SSD", tint: "#f0a24b", req: ["mobo"], w: 8, L: [60, 160, 110, 16], layer: 2,
+    sum: "Long-term storage for Windows, your games and files. NVMe M.2 SSDs plug straight into the motherboard and are many times faster than old hard drives.",
+    tip: "A faster SSD shortens loading screens, but doesn't raise your frame rate." },
+  { id: "gpu", name: "Graphics Card (GPU)", short: "GPU", tint: "#ff6b5e", req: ["mobo"], w: 300, L: [24, 196, 236, 52], layer: 3,
+    sum: "The graphics card draws every frame you see. It's the most important part for gaming performance, and usually the most expensive and power-hungry.",
+    tip: "Use the top PCIe x16 slot. Push until the latch clicks, then screw the bracket to the case." },
+  { id: "cables", name: "Cables", short: "Cables", tint: "#ff7eb6", req: ["psu", "mobo", "gpu"], w: 0, L: [0, 0, 320, 400], layer: 5,
+    sum: "Power and signal connections: the 24-pin motherboard cable, the 8-pin CPU cable, the GPU power cable, and small front-panel wires for the power button, USB and audio.",
+    tip: "When a new build won't turn on, it's usually a loose cable or front-panel connector." },
+];
+const BY = Object.fromEntries(PARTS.map(p => [p.id, p]));
+
+// Small tray icons (24 x 24, stroke = currentColor)
+const ICONS = {
+  case: '<rect x="6" y="2.5" width="12" height="19" rx="2"/><circle cx="12" cy="15" r="3"/><path d="M9 6h6"/>',
+  psu: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M12.5 8.5 10 12h4l-2.5 3.5"/>',
+  mobo: '<rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="5" height="5"/><path d="M15 6v8M17.5 6v8M6 17h10"/>',
+  cpu: '<rect x="6" y="6" width="12" height="12" rx="1.5"/><path d="M9 3v3M12 3v3M15 3v3M9 18v3M12 18v3M15 18v3M3 9h3M3 12h3M3 15h3M18 9h3M18 12h3M18 15h3"/>',
+  cooler: '<circle cx="12" cy="12" r="9"/><path d="M12 12c0-4 2-5.5 4-5M12 12c3.5 2 3.8 4.4 2.5 6M12 12c-3.5 2-5.8 1-6.5-1"/>',
+  ram: '<rect x="2.5" y="7" width="19" height="8" rx="1"/><path d="M6 10h2M10 10h2M14 10h2M5 15v3M19 15v3M11 15v3"/>',
+  ssd: '<rect x="2.5" y="9" width="19" height="6" rx="1"/><path d="M5.5 9v6M9 12h7"/>',
+  gpu: '<rect x="2.5" y="6" width="19" height="10" rx="2"/><circle cx="8" cy="11" r="2.6"/><circle cx="16" cy="11" r="2.6"/><path d="M5 16v2.5h8V16"/>',
+  cables: '<path d="M4 20c0-6 4-6 8-8s8-2 8-8"/><path d="M3 18h3v4H3zM18 2h3v4h-3z"/>',
+};
+const icon = (id, extra = "") =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra}>${ICONS[id]}</svg>`;
+
+// ---------- Drawings (local coordinates, same units as the case) ----------
+function fan(cx, cy, d, color) {
+  let blades = "";
+  const off = -d * 0.21;
+  for (let i = 0; i < 7; i++) {
+    blades += `<ellipse cx="0" cy="${off}" rx="${d * 0.085}" ry="${d * 0.18}" transform="rotate(${(i * 360) / 7}) rotate(20 0 ${off})"/>`;
+  }
+  return `<g transform="translate(${cx} ${cy})" style="color:${color}">
+    <circle r="${d / 2}" fill="#000" fill-opacity=".6"/>
+    <g class="blades"><circle r="${d / 2 - 1}" fill="none"/>${blades}<circle r="${d * 0.13}" fill="#3a3f45"/></g>
+    <circle class="ring" r="${d / 2 - d * 0.03}" fill="none" stroke-width="${Math.max(1, d * 0.06)}"/>
+  </g>`;
+}
+const rep = (n, f) => Array.from({ length: n }, (_, i) => f(i)).join("");
+
+const ART = {
+  case: () => `
+    <rect width="320" height="400" rx="14" fill="#262c33"/>
+    <rect class="shell" x="1.5" y="1.5" width="317" height="397" rx="13" fill="none" stroke="#4a535d" stroke-width="3"/>
+    <rect x="10" y="10" width="300" height="380" rx="8" fill="#14181d"/>
+    <rect x="10" y="302" width="300" height="88" fill="#2a3038"/>
+    ${rep(3, i => fan(287, 71 + i * 80, 42, "#4fd1e8"))}
+    <circle class="led" cx="287" cy="24" r="6"/>
+    <text x="287" y="298" text-anchor="middle" fill="#6b7580" font-size="9" font-weight="700" font-family="JetBrains Mono, monospace">FRONT</text>`,
+  psu: () => `
+    <rect width="150" height="66" rx="5" fill="#101215" stroke="#f2cf3d" stroke-opacity=".6" stroke-width="1.5"/>
+    ${fan(34, 33, 52, "#f2cf3d")}
+    <text x="70" y="27" fill="#f2cf3d" font-size="15" font-weight="800" font-family="Saira Semi Condensed, sans-serif">PSU</text>
+    <text x="70" y="41" fill="#c9cfd5" font-size="8" font-family="JetBrains Mono, monospace">850 W · 80+ Gold</text>
+    ${rep(4, i => `<rect x="${72 + i * 17}" y="48" width="13" height="9" rx="1" fill="#3b424a"/>`)}`,
+  mobo: () => `
+    <rect width="196" height="250" rx="4" fill="#123a2b" stroke="#5ad48a" stroke-opacity=".5"/>
+    ${rep(6, i => `<rect x="10" y="${110 + i * 8}" width="120" height="1.2" fill="#5ad48a" fill-opacity=".2"/>`)}
+    <rect x="4" y="8" width="18" height="70" rx="2" fill="#57606a"/>
+    <rect x="40" y="6" width="70" height="14" rx="2" fill="#727b85"/>
+    <rect x="28" y="22" width="12" height="62" rx="2" fill="#727b85"/>
+    <rect x="66" y="40" width="52" height="52" rx="2" fill="#2d3238" stroke="#bfc6cc" stroke-width="1.5"/>
+    ${rep(4, i => `<rect x="${148 + i * 9}" y="22" width="6" height="108" rx="1" fill="#1b1f24" stroke="#69727c" stroke-width=".8"/>`)}
+    <rect x="186" y="100" width="7" height="40" rx="1" fill="#dfe3e7"/>
+    <rect x="36" y="132" width="110" height="16" rx="1" fill="none" stroke="#7d8790" stroke-width=".8" stroke-dasharray="3 2"/>
+    <rect x="14" y="214" width="120" height="6" rx="1" fill="#bfc6cc"/>
+    <rect x="150" y="180" width="30" height="30" rx="2" fill="#5f6872"/>
+    <circle class="led" cx="165" cy="195" r="9"/>`,
+  cpu: () => `
+    <rect width="48" height="48" rx="4" fill="url(#cpuMetal)"/>
+    <rect x="6" y="6" width="36" height="36" rx="3" fill="none" stroke="#7f878f"/>
+    <text x="24" y="28" text-anchor="middle" fill="#3a63c9" font-size="10" font-weight="800" font-family="Saira Semi Condensed, sans-serif">CPU</text>
+    <path d="M2 2h8L2 10z" fill="#f2cf3d"/>`,
+  cooler: () => `
+    <rect width="76" height="76" rx="6" fill="#8c949c"/>
+    ${rep(9, i => `<rect x="${4 + i * 8}" y="2" width="3" height="72" fill="#6a727a"/>`)}
+    ${fan(38, 38, 64, "#4fd1e8")}`,
+  ram: () => [3, 19].map(x => `
+    <rect x="${x}" y="0" width="10" height="104" rx="2" fill="#1f242a" stroke="#b06cff" stroke-opacity=".7"/>
+    ${rep(5, c => `<rect x="${x + 2}" y="${18 + c * 17}" width="6" height="12" fill="#434a52"/>`)}
+    <rect class="rgb" x="${x + 1}" y="2" width="8" height="12" rx="1"/>`).join(""),
+  ssd: () => `
+    <rect width="110" height="16" rx="2" fill="#0d0f12" stroke="#f0a24b" stroke-opacity=".7"/>
+    <rect x="0" y="2" width="5" height="12" fill="#e0b84a"/>
+    ${rep(3, i => `<rect x="${12 + i * 22}" y="3" width="18" height="10" fill="#3a4047"/>`)}
+    <text x="80" y="11" fill="#f0a24b" font-size="7" font-weight="700" font-family="JetBrains Mono, monospace">NVMe</text>
+    <circle class="led" cx="106" cy="8" r="2"/>`,
+  gpu: () => `
+    <rect x="16" y="46" width="100" height="5" fill="#e0b84a"/>
+    <rect width="236" height="48" rx="6" fill="#30363d" stroke="#ff6b5e" stroke-opacity=".7" stroke-width="1.5"/>
+    <rect width="4" height="48" fill="#9aa1a8"/>
+    ${fan(46, 24, 40, "#ff6b5e")}${fan(110, 24, 40, "#ff6b5e")}${fan(174, 24, 40, "#ff6b5e")}
+    <text x="214" y="29" text-anchor="middle" fill="#ff6b5e" font-size="10" font-weight="800" font-family="Saira Semi Condensed, sans-serif">GPU</text>
+    <rect x="196" y="0" width="22" height="6" rx="1" fill="#0d0f12"/>`,
+  cables: () => `
+    <path d="M150 316C240 300 240 150 216 140" fill="none" stroke="#e6e9ec" stroke-width="6" stroke-linecap="round"/>
+    <path d="M50 316C16 260 16 40 56 36" fill="none" stroke="#ff7eb6" stroke-width="4" stroke-linecap="round"/>
+    <path d="M110 316C150 280 250 260 232 198" fill="none" stroke="#ff7eb6" stroke-opacity=".8" stroke-width="4" stroke-linecap="round"/>
+    <path d="M200 278C250 300 250 30 282 30" fill="none" stroke="#f0a24b" stroke-opacity=".8" stroke-width="1.5" stroke-dasharray="4 2" stroke-linecap="round"/>`,
+};
+
+// ---------- State ----------
+const S = { installed: new Set(), selected: "case", on: false, status: "Start with the case: tap the dashed outline, or pick it below and tap Install." };
+let autoTimer = null;
+
+const missing = id => BY[id].req.filter(r => !S.installed.has(r));
+const blockers = id => PARTS.filter(p => S.installed.has(p.id) && p.req.includes(id)).map(p => p.id);
+const canInstall = id => !S.installed.has(id) && missing(id).length === 0;
+const complete = () => S.installed.size === PARTS.length;
+const draw = () => PARTS.reduce((t, p) => t + (S.installed.has(p.id) ? p.w : 0), 0);
+const names = ids => {
+  const n = ids.map(i => BY[i].short);
+  return n.length < 2 ? (n[0] || "") : n.slice(0, -1).join(", ") + " and " + n[n.length - 1];
+};
+
+function install(id) {
+  if (S.installed.has(id)) return;
+  const m = missing(id);
+  if (m.length) { S.status = `The ${BY[id].short} needs the ${names(m)} installed first.`; render(); return; }
+  S.installed.add(id);
+  S.selected = id;
+  addPartNode(id);
+  const next = PARTS.find(p => canInstall(p.id));
+  S.status = next ? `${BY[id].name} installed. Next up: ${next.short}.` : "Build complete! Press the power button.";
+  render();
+}
+
+function remove(id) {
+  if (!S.installed.has(id)) return;
+  const b = blockers(id);
+  if (b.length) { S.status = `Remove the ${names(b)} first. It's attached to the ${BY[id].short}.`; render(); return; }
+  S.on = false;
+  S.installed.delete(id);
+  removePartNode(id);
+  S.status = `${BY[id].name} removed.`;
+  render();
+}
+
+function togglePower() {
+  if (!complete()) {
+    S.status = `Can't power on yet. Missing: ${names(PARTS.filter(p => !S.installed.has(p.id)).map(p => p.id))}.`;
+  } else {
+    S.on = !S.on;
+    S.status = S.on
+      ? `Powered on! The fans spin, the PC passes its self-test (POST) and boots. Total draw ≈ ${draw()} W.`
+      : "Powered off. Always switch off and unplug before removing parts.";
+  }
+  render();
+}
+
+function runSequence(ids, step) {
+  clearInterval(autoTimer);
+  let i = 0;
+  const tick = () => {
+    if (i >= ids.length) { clearInterval(autoTimer); return; }
+    step(ids[i++]);
+  };
+  tick();
+  autoTimer = setInterval(tick, 420);
+}
+function buildAll() { runSequence(PARTS.map(p => p.id).filter(id => !S.installed.has(id)), install); }
+function takeApart() {
+  S.on = false;
+  const ids = PARTS.map(p => p.id).filter(id => S.installed.has(id)).reverse();
+  if (!ids.length) { S.status = "Nothing to take apart yet."; render(); return; }
+  runSequence(ids, id => {
+    remove(id);
+    if (S.installed.size === 0) { S.status = "Everything is taken apart. Start again with the case."; S.selected = "case"; render(); }
+  });
+}
+
+// ---------- Scene ----------
+const NS = "http://www.w3.org/2000/svg";
+const partsG = document.getElementById("parts");
+const ghostsG = document.getElementById("ghosts");
+const selG = document.getElementById("sel");
+const scene = document.getElementById("scene");
+
+function addPartNode(id) {
+  partsG.querySelector(`[data-part="${id}"]`)?.remove();
+  const p = BY[id];
+  const g = document.createElementNS(NS, "g");
+  g.setAttribute("class", "part enter");
+  g.dataset.part = id;
+  g.innerHTML = `<g transform="translate(${p.L[0]} ${p.L[1]})">${ART[id]()}</g>`;
+  g.addEventListener("animationend", () => g.classList.remove("enter"), { once: true });
+  // keep drawing order by layer
+  const after = [...partsG.children].find(n => !n.classList.contains("leave") && BY[n.dataset.part].layer > p.layer);
+  partsG.insertBefore(g, after || null);
+}
+
+function removePartNode(id) {
+  const g = partsG.querySelector(`[data-part="${id}"]:not(.leave)`);
+  if (!g) return;
+  g.classList.remove("enter");
+  g.classList.add("leave");
+  setTimeout(() => g.remove(), 340);
+}
+
+function renderScene() {
+  scene.classList.toggle("on", S.on);
+  ghostsG.innerHTML = PARTS.filter(p => p.id !== "cables" && canInstall(p.id)).map(p => {
+    const [x, y, w, h] = p.L;
+    const label = p.id === "case" ? "Tap to place the case" : p.short;
+    const fs = Math.min(p.id === "case" ? 15 : 11, (w - 4) / (label.length * 0.6));
+    return `<g class="ghost${S.selected === p.id ? " hl" : ""}" data-ghost="${p.id}" role="button" aria-label="Install ${p.name}">
+      <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/>
+      <text x="${x + w / 2}" y="${y + h / 2}" text-anchor="middle" dominant-baseline="central" style="font-size:${fs}px">${label}</text>
+    </g>`;
+  }).join("");
+  const sp = BY[S.selected];
+  selG.innerHTML = sp && S.installed.has(sp.id) && sp.id !== "cables"
+    ? `<rect class="selbox" x="${sp.L[0] - 1}" y="${sp.L[1] - 1}" width="${sp.L[2] + 2}" height="${sp.L[3] + 2}" rx="6"/>`
+    : "";
+}
+
+scene.addEventListener("click", e => {
+  const ghost = e.target.closest("[data-ghost]");
+  if (ghost) { install(ghost.dataset.ghost); return; }
+  const part = e.target.closest("[data-part]");
+  if (part && !part.classList.contains("leave")) { S.selected = part.dataset.part; render(); }
+});
+
+// ---------- Panel, tray, header ----------
+function stateLine(id) {
+  if (S.installed.has(id)) {
+    const b = blockers(id);
+    return b.length
+      ? [`Installed · remove ${b.map(i => BY[i].short).join(", ")} first`, "var(--ok)"]
+      : [`Installed · ≈${BY[id].w} W`, "var(--ok)"];
+  }
+  const m = missing(id);
+  return m.length ? [`Needs: ${m.map(i => BY[i].short).join(", ")}`, "var(--warn)"] : ["Ready to install", "var(--accent)"];
+}
+
+function renderInfo() {
+  const p = BY[S.selected];
+  const [txt, col] = stateLine(p.id);
+  const inst = S.installed.has(p.id);
+  document.getElementById("info").innerHTML = `
+    <div class="info-top">
+      <span class="ico" style="color:${p.tint}">${icon(p.id, 'width="30" height="30"')}</span>
+      <div class="txt"><h2>${p.name}</h2><div class="state" style="color:${col}">${txt}</div></div>
+      ${inst
+        ? `<button class="act remove" id="act" type="button">Remove</button>`
+        : `<button class="act install${canInstall(p.id) ? "" : " locked"}" id="act" type="button">Install</button>`}
+    </div>
+    <div class="scroll">
+      <p>${p.sum}</p>
+      <div class="tip"><b>Tip</b><span>${p.tip}</span></div>
+    </div>`;
+  document.getElementById("act").onclick = () => (inst ? remove(p.id) : install(p.id));
+}
+
+function renderTray() {
+  document.getElementById("tray").innerHTML = PARTS.map(p => {
+    const done = S.installed.has(p.id), avail = canInstall(p.id);
+    const badge = done
+      ? `<svg class="badge" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="var(--ok)"/><path d="M4.5 8.2l2.3 2.3 4.7-4.8" fill="none" stroke="#0c0f13" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+      : avail ? "" : `<svg class="badge" viewBox="0 0 16 16" fill="var(--warn)"><rect x="3.5" y="7" width="9" height="7" rx="1.5"/><path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7" fill="none" stroke="var(--warn)" stroke-width="1.6"/></svg>`;
+    return `<button class="card${done ? " done" : avail ? " avail" : ""}" type="button" data-id="${p.id}"
+      style="--tint:${p.tint}" aria-pressed="${S.selected === p.id}">${icon(p.id)}<span>${p.short}</span>${badge}</button>`;
+  }).join("");
+}
+document.getElementById("tray").addEventListener("click", e => {
+  const c = e.target.closest(".card");
+  if (c) { S.selected = c.dataset.id; render(); }
+});
+
+function render() {
+  document.getElementById("meta").textContent = `${S.installed.size}/${PARTS.length} parts · ≈${draw()} W draw`;
+  document.getElementById("progress").style.width = `${(S.installed.size / PARTS.length) * 100}%`;
+  const pw = document.getElementById("power");
+  pw.classList.toggle("ready", complete());
+  pw.classList.toggle("on", S.on);
+  pw.setAttribute("aria-label", S.on ? "Power off" : "Power on");
+  document.getElementById("status").textContent = S.status;
+  renderScene();
+  renderInfo();
+  renderTray();
+}
+
+document.getElementById("power").onclick = togglePower;
+document.getElementById("buildAll").onclick = buildAll;
+document.getElementById("takeApart").onclick = takeApart;
+
+// Open with a partly built PC so the first view shows how it works.
+["case", "psu", "mobo", "cpu"].forEach(id => { S.installed.add(id); addPartNode(id); });
+partsG.querySelectorAll(".part").forEach(n => n.classList.remove("enter"));
+S.selected = "cooler";
+S.status = "Example: half-built PC. The CPU is in, so the cooler is next. Tap Install, or a dashed outline.";
+render();
+</script>
