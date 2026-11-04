@@ -41,7 +41,8 @@ func test_negative_money_clamped() -> void:
 
 
 func test_wrong_setting_type_ignored() -> void:
-	var loaded: Dictionary = SaveSerializer.deserialize('{"settings": {"invert_y": "yes", "sfx_volume": 0.5}}')
+	var loaded: Dictionary = SaveSerializer.deserialize(
+		'{"settings": {"invert_y": "yes", "sfx_volume": 0.5}}')
 	var settings: Dictionary = loaded[SaveSerializer.KEY_SETTINGS]
 	assert_false(settings["invert_y"])
 	assert_almost_eq(float(settings["sfx_volume"]), 0.5, 0.0001)

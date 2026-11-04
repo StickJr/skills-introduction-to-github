@@ -1,7 +1,7 @@
 extends Control
 ## Title screen. Built in code to keep the .tscn tiny.
 
-const TEST_SCENE_PATH: String = "res://world/TestScene.tscn"
+const COURSE_SCENE_PATH: String = "res://world/GreyboxCourse.tscn"
 
 @export var title_font_size: int = 72
 @export var subtitle_font_size: int = 22
@@ -63,7 +63,7 @@ func _make_button(label: String, callback: Callable) -> Button:
 
 
 func _on_play_pressed() -> void:
-	get_tree().change_scene_to_file(TEST_SCENE_PATH)
+	get_tree().change_scene_to_file(COURSE_SCENE_PATH)
 
 
 func _on_quit_pressed() -> void:
