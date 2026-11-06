@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#7c3aed">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Tap &amp; Paint">
+  <meta name="description" content="A tap-and-swipe painting game for toddlers.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>Tap &amp; Paint</title>
+</head>
+<body>
+  <main id="home" class="screen">
+    <h1 id="title" class="title">Tap &amp; Paint</h1>
+    <p class="subtitle">Pick a world to paint!</p>
+    <div id="envGrid" class="env-grid"></div>
+    <nav class="home-bar">
+      <button id="albumBtn" class="pill">📚 <span>My Album</span></button>
+      <button id="soundBtn" class="pill round" aria-label="Sound on">🔊</button>
+    </nav>
+  </main>
+
+  <section id="paint" class="screen" hidden>
+    <canvas id="bg"></canvas>
+    <canvas id="paintLayer"></canvas>
+    <canvas id="fx"></canvas>
+    <div class="paint-ui">
+      <button id="exitBtn" class="hold-btn corner-left" aria-label="Hold to go home">
+        <span class="ring"></span><span class="ico">🏠</span>
+      </button>
+      <div class="corner-right">
+        <button id="clearBtn" class="hold-btn" aria-label="Hold for a new page">
+          <span class="ring"></span><span class="ico">✨</span>
+        </button>
+        <button id="saveBtn" class="hold-btn" aria-label="Hold to save">
+          <span class="ring"></span><span class="ico">📸</span>
+        </button>
+      </div>
+    </div>
+    <div id="flash" class="flash"></div>
+  </section>
+
+  <section id="album" class="screen" hidden>
+    <header class="album-head">
+      <button id="albumBack" class="pill round" aria-label="Back">⬅️</button>
+      <h2>My Album</h2>
+    </header>
+    <div id="albumGrid" class="album-grid"></div>
+    <p id="albumEmpty" class="album-empty" hidden>No paintings yet!<br>Go paint something 🎨</p>
+  </section>
+
+  <div id="viewer" class="viewer" hidden>
+    <img id="viewerImg" alt="Saved painting">
+    <div id="viewerDate" class="viewer-date"></div>
+    <div class="viewer-bar">
+      <button id="viewerClose" class="pill round" aria-label="Close">✖️</button>
+      <button id="viewerShare" class="pill">📤 <span>Save / Share</span></button>
+      <button id="viewerDelete" class="hold-btn" aria-label="Hold to delete">
+        <span class="ring"></span><span class="ico">🗑️</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
