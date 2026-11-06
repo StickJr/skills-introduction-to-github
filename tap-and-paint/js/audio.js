@@ -14,14 +14,19 @@ const VOICES = {
 
 let ac = null;
 let master = null;
-let enabled = localStorage.getItem(KEY) !== 'off';
+// Storage can be blocked (private mode, sandboxed frames): fall back quietly.
+const store = {
+  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } },
+};
+let enabled = store.get(KEY) !== 'off';
 let recent = [];
 
 export const isOn = () => enabled;
 
 export function toggle() {
   enabled = !enabled;
-  localStorage.setItem(KEY, enabled ? 'on' : 'off');
+  store.set(KEY, enabled ? 'on' : 'off');
   if (enabled) unlock();
   return enabled;
 }

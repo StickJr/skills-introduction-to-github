@@ -56,6 +56,11 @@ the root folder, then open `https://<user>.github.io/<repo>/tap-and-paint/`.
   **App pinning** (Android: Settings → Security).
 - On iPhone, the ring/silent switch also mutes the sounds. There's a 🔊 button on the home screen too.
 
+### Single-file version
+
+`python3 build-single-file.py` bundles everything into `dist/tap-and-paint.html`, one page you
+can open or host anywhere (no offline/home-screen install in that version).
+
 ## Files
 
 ```

@@ -538,6 +538,21 @@ async function shareCurrent() {
   if (!current) return;
   const e = getEnv(current.env);
   const name = `${e.name.toLowerCase()}-painting-${new Date(current.created).toISOString().slice(0, 10)}.jpg`;
+
+  // Inside the Claude artifact viewer, sharing and downloads go through its save prompt.
+  if (typeof window.claude?.use === 'function') {
+    const downloads = await window.claude.use('downloads');
+    if (downloads) {
+      try {
+        await downloads.save({ filename: name, data: current.image });
+        toast('Saved! ⭐');
+      } catch (err) {
+        if (err?.code !== 'declined') toast('Saving is not available here 😕', 2500);
+      }
+      return;
+    }
+  }
+
   const file = new File([current.image], name, { type: current.image.type });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
@@ -589,6 +604,8 @@ buildHome();
 paintSound();
 goHome();
 
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
-}
+try {
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+} catch { /* not allowed here (e.g. inside a sandboxed frame) */ }
