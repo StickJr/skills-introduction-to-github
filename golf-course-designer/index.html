@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Golf Course Designer</title>
+<style>
+  :root {
+    --bg: #14201a;
+    --panel: #1d2c24;
+    --panel2: #26382e;
+    --line: #34493c;
+    --text: #e9f2ec;
+    --muted: #9db3a5;
+    --accent: #8fd45a;
+    --accent-ink: #12210f;
+    --danger: #e0685c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+
+  /* Top bar */
+  header { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: var(--panel);
+    border-bottom: 1px solid var(--line); flex: none; }
+  header .title { flex: 1; min-width: 0; text-align: center; }
+  header .title b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  header .title span { color: var(--muted); font-size: 12px; }
+  .iconbtn { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px;
+    min-width: 40px; height: 40px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+  .iconbtn:disabled { opacity: .35; }
+  .iconbtn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+
+  /* Canvas */
+  #stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #0e1612; }
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+  #hud { position: absolute; left: 8px; top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  #hud .iconbtn { background: rgba(29,44,36,.9); }
+  #status { position: absolute; right: 8px; top: 8px; background: rgba(20,32,26,.85); border: 1px solid var(--line);
+    border-radius: 8px; padding: 4px 8px; font-size: 12px; color: var(--muted); pointer-events: none; max-width: 60%; text-align: right; }
+  #warn { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); background: rgba(20,32,26,.92);
+    border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 12px; color: #f2c46d; pointer-events: none; white-space: nowrap; }
+  #warn:empty { display: none; }
+
+  /* Bottom toolbar */
+  footer { flex: none; background: var(--panel); border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+  .tabs button { flex: 1; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel2); }
+  .tabs button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  .palette { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 4px; scrollbar-width: thin; }
+  .swatch { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 62px; padding: 4px 2px;
+    border-radius: 10px; border: 2px solid transparent; background: var(--panel2); font-size: 11px; color: var(--muted); }
+  .swatch.on { border-color: var(--accent); color: var(--text); }
+  .swatch i { display: block; width: 30px; height: 22px; border-radius: 5px; border: 1px solid rgba(0,0,0,.35);
+    font-style: normal; font-size: 18px; line-height: 22px; text-align: center; }
+  .palette .sep { flex: none; align-self: stretch; width: 1px; background: var(--line); margin: 0 2px; }
+  .palette .grouplabel { flex: none; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .tools { display: flex; gap: 4px; overflow-x: auto; }
+  .tools button { flex: none; height: 36px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel2); }
+  .tools button.on { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tools .spacer { flex: 1; }
+
+  /* Sheets */
+  .sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; z-index: 10; }
+  .sheet-backdrop.open { display: block; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: 88dvh; overflow-y: auto; background: var(--panel);
+    border-top-left-radius: 16px; border-top-right-radius: 16px; border: 1px solid var(--line); padding: 14px 14px calc(18px + env(safe-area-inset-bottom));
+    z-index: 11; transform: translateY(105%); transition: transform .2s ease; max-width: 640px; margin: 0 auto; }
+  .sheet.open { transform: translateY(0); }
+  .sheet h2 { margin: 0 0 10px; font-size: 17px; display: flex; align-items: center; justify-content: space-between; }
+  .sheet h3 { margin: 16px 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .field label { font-size: 12px; color: var(--muted); }
+  .field input, .field textarea, .field select { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .btn { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; text-align: center; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  .btn.danger { color: var(--danger); }
+  .btn.block { width: 100%; display: block; margin-bottom: 8px; }
+  .holelist { display: flex; flex-direction: column; gap: 6px; }
+  .holeitem { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--line); }
+  .holeitem.on { border-color: var(--accent); }
+  .holeitem .n { width: 26px; height: 26px; border-radius: 50%; background: var(--bg); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; flex: none; }
+  .holeitem .meta { flex: 1; min-width: 0; }
+  .holeitem .meta small { color: var(--muted); display: block; }
+  .holeitem button { background: transparent; border: none; padding: 4px 6px; color: var(--muted); }
+  .note { color: var(--muted); font-size: 12px; margin: 6px 0 10px; }
+  .checks { list-style: none; padding: 0; margin: 0 0 10px; }
+  .checks li { padding: 3px 0; font-size: 13px; }
+  .checks li.bad { color: #f2c46d; }
+  .checks li.ok { color: var(--accent); }
+  #exportText { font: 11px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; min-height: 160px; white-space: pre; }
+  .toast { position: fixed; left: 50%; top: 14px; transform: translateX(-50%) translateY(-80px); background: var(--accent); color: var(--accent-ink);
+    padding: 8px 14px; border-radius: 10px; font-weight: 600; z-index: 30; transition: transform .2s; pointer-events: none; }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .confirm { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; padding: 20px; }
+  .confirm.open { display: flex; }
+  .confirm .box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; max-width: 360px; width: 100%; }
+  .confirm .box p { margin: 0 0 14px; }
+  .legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 4px 10px; font-size: 12px; color: var(--muted); }
+  .legend code { color: var(--text); background: var(--bg); padding: 0 5px; border-radius: 4px; margin-right: 4px; }
+  @media (min-width: 900px) {
+    .palette { flex-wrap: wrap; overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="iconbtn" id="btnMenu" title="Course & export">☰</button>
+    <button class="iconbtn" id="btnPrev" title="Previous hole">◀</button>
+    <div class="title" id="holeTitle"><b>Hole 1</b><span>Par 4</span></div>
+    <button class="iconbtn" id="btnNext" title="Next hole">▶</button>
+    <button class="iconbtn" id="btnHole" title="Hole settings">⚙︎</button>
+    <button class="iconbtn primary" id="btnSend" title="Send to Claude">Send</button>
+  </header>
+
+  <div id="stage">
+    <canvas id="canvas"></canvas>
+    <div id="hud">
+      <button class="iconbtn" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
+      <button class="iconbtn" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
+      <button class="iconbtn" id="btnFit" title="Fit to screen">⤢</button>
+      <button class="iconbtn" id="btnGrid" title="Toggle grid">#</button>
+    </div>
+    <div id="status"></div>
+    <div id="warn"></div>
+  </div>
+
+  <footer>
+    <div class="tabs" id="modeTabs">
+      <button data-mode="terrain" class="on">Terrain</button>
+      <button data-mode="mess">Mess</button>
+      <button data-mode="objects">Objects</button>
+    </div>
+    <div class="palette" id="palette"></div>
+    <div class="tools" id="tools"></div>
+  </footer>
+</div>
+
+<!-- Course / menu sheet -->
+<div class="sheet-backdrop" id="backdrop"></div>
+<div class="sheet" id="sheetCourse">
+  <h2>Course <button class="iconbtn" data-close>✕</button></h2>
+  <div class="field"><label>Course name</label><input id="cName"></div>
+  <div class="grid2">
+    <div class="field"><label>Designer</label><input id="cAuthor"></div>
+    <div class="field"><label>Yards per tile</label><input id="cTile" type="number" min="1" max="50" step="1"></div>
+  </div>
+  <div class="field"><label>Description / theme</label><textarea id="cDesc" placeholder="e.g. Autumn parkland course, lots of leaves to rake"></textarea></div>
+
+  <h3>Holes</h3>
+  <div class="holelist" id="holeList"></div>
+  <div class="grid2" style="margin-top:8px">
+    <button class="btn" id="btnAddHole">+ New hole</button>
+    <button class="btn" id="btnDupHole">Duplicate current</button>
+  </div>
+
+  <h3>Save &amp; load</h3>
+  <p class="note">Your work saves automatically in this browser. To move it to another device, copy the JSON and import it there.</p>
+  <div class="grid2">
+    <button class="btn" id="btnImport">Import JSON</button>
+    <button class="btn" id="btnDownload">Download .json</button>
+  </div>
+  <input type="file" id="fileInput" accept=".json,application/json,text/plain" hidden>
+  <button class="btn block danger" id="btnReset" style="margin-top:8px">Start a new course</button>
+
+  <h3>Legend</h3>
+  <div class="legend" id="legend"></div>
+</div>
+
+<!-- Hole settings sheet -->
+<div class="sheet" id="sheetHole">
+  <h2>Hole settings <button class="iconbtn" data-close>✕</button></h2>
+  <div class="grid2">
+    <div class="field"><label>Hole name</label><input id="hName"></div>
+    <div class="field"><label>Par</label>
+      <select id="hPar"><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
+  </div>
+  <div class="field"><label>Notes for the game (difficulty, goals, story…)</label>
+    <textarea id="hNotes" placeholder="e.g. Tutorial hole. Player must pick up all trash before the clock runs out."></textarea></div>
+  <h3>Size (tiles)</h3>
+  <div class="grid3">
+    <div class="field"><label>Width</label><input id="hW" type="number" min="8" max="200"></div>
+    <div class="field"><label>Height</label><input id="hH" type="number" min="8" max="200"></div>
+    <div class="field"><label>&nbsp;</label><button class="btn" id="btnResize">Apply</button></div>
+  </div>
+  <p class="note" id="sizeNote"></p>
+  <h3>Start over</h3>
+  <div class="grid2">
+    <button class="btn" id="btnStarter">Starter layout</button>
+    <button class="btn" id="btnClear">Clear to rough</button>
+  </div>
+  <button class="btn block danger" id="btnDeleteHole" style="margin-top:8px">Delete this hole</button>
+</div>
+
+<!-- Send / export sheet -->
+<div class="sheet" id="sheetSend">
+  <h2>Send to Claude <button class="iconbtn" data-close>✕</button></h2>
+  <p class="note">Copy this, then paste it into your game's Claude Code session. It includes instructions and a full description of the format, so Claude can turn each hole into a level.</p>
+  <div class="field"><label>What to send</label>
+    <select id="exportScope"><option value="all">Whole course (all holes)</option><option value="current">Current hole only</option></select></div>
+  <ul class="checks" id="checks"></ul>
+  <div class="grid2">
+    <button class="btn primary" id="btnCopyPrompt">Copy for Claude</button>
+    <button class="btn" id="btnCopyJson">Copy JSON only</button>
+  </div>
+  <h3>Preview</h3>
+  <div class="field"><textarea id="exportText" readonly></textarea></div>
+  <p class="note">If copying doesn't work on your device, tap the box above, select all, and copy by hand.</p>
+</div>
+
+<!-- Import sheet -->
+<div class="sheet" id="sheetImport">
+  <h2>Import course <button class="iconbtn" data-close>✕</button></h2>
+  <p class="note">Paste course JSON (from "Copy JSON only" or a message copied from this app), or open a .json file.</p>
+  <div class="field"><textarea id="importText" style="min-height:160px;font-family:ui-monospace,monospace;font-size:11px"></textarea></div>
+  <div class="grid2">
+    <button class="btn primary" id="btnDoImport">Import pasted text</button>
+    <button class="btn" id="btnPickFile">Open file…</button>
+  </div>
+</div>
+
+<div class="confirm" id="confirm"><div class="box"><p id="confirmMsg"></p>
+  <div class="grid2"><button class="btn" id="confirmNo">Cancel</button><button class="btn primary" id="confirmYes">OK</button></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------------- Definitions ---------------- */
+const TILE = 16; // world pixels per tile at zoom 1
+
+const TERRAIN = [
+  { ch: 'R', id: 'rough',        name: 'Rough',        color: '#5f9e3a' },
+  { ch: 'F', id: 'fairway',      name: 'Fairway',      color: '#7cc24a' },
+  { ch: 'G', id: 'green',        name: 'Green',        color: '#a3e36f' },
+  { ch: 'T', id: 'tee_box',      name: 'Tee box',      color: '#8ed65a' },
+  { ch: 'S', id: 'sand',         name: 'Bunker',       color: '#e6d39a' },
+  { ch: 'W', id: 'water',        name: 'Water',        color: '#3a8fd6' },
+  { ch: 'D', id: 'deep_rough',   name: 'Deep rough',   color: '#477d2b' },
+  { ch: 'X', id: 'woods',        name: 'Woods',        color: '#2f5e22' },
+  { ch: 'P', id: 'cart_path',    name: 'Cart path',    color: '#b9b2a3' },
+  { ch: 'O', id: 'out_of_bounds',name: 'Out of bounds',color: '#7d7d7d' },
+];
+const TERRAIN_BY_CH = Object.fromEntries(TERRAIN.map(t => [t.ch, t]));
+
+const MESS = [
+  { ch: 'L', id: 'leaves',    name: 'Leaves',    color: '#d9822b' },
+  { ch: 'M', id: 'mud',       name: 'Mud',       color: '#6b4a2b' },
+  { ch: 'C', id: 'clippings', name: 'Clippings', color: '#c9d65a' },
+  { ch: 'V', id: 'divots',    name: 'Divots',    color: '#4a3520' },
+  { ch: 'K', id: 'weeds',     name: 'Weeds',     color: '#3f7f2a' },
+];
+const MESS_BY_CH = Object.fromEntries(MESS.map(m => [m.ch, m]));
+
+const OBJECTS = [
+  { id: 'tee',          name: 'Tee (ball start)', icon: '🏌️', group: 'Gameplay', unique: true,  desc: 'Where the golf ball starts. One per hole.' },
+  { id: 'cup',          name: 'Cup / flag',       icon: '⛳', group: 'Gameplay', unique: true,  desc: 'The hole the ball must go in. One per hole, normally on the green.' },
+  { id: 'player_start', name: 'Cleaner start',    icon: '🧹', group: 'Gameplay', unique: true,  desc: 'Where the cleaning player spawns. One per hole (optional).' },
+  { id: 'trash_bin',    name: 'Trash bin',        icon: '🗑️', group: 'Gameplay', unique: false, desc: 'Drop-off point for collected trash.' },
+  { id: 'tree',         name: 'Tree',             icon: '🌳', group: 'Scenery',  unique: false, desc: 'Single tree. Blocks shots and movement.' },
+  { id: 'pine',         name: 'Pine',             icon: '🌲', group: 'Scenery',  unique: false, desc: 'Pine tree. Blocks shots and movement.' },
+  { id: 'bush',         name: 'Bush',             icon: '🌿', group: 'Scenery',  unique: false, desc: 'Small bush.' },
+  { id: 'flowers',      name: 'Flowers',          icon: '🌼', group: 'Scenery',  unique: false, desc: 'Decorative flower bed.' },
+  { id: 'rock',         name: 'Rock',             icon: '🪨', group: 'Scenery',  unique: false, desc: 'Boulder. Blocks movement.' },
+  { id: 'bench',        name: 'Bench',            icon: '🪑', group: 'Scenery',  unique: false, desc: 'Bench.' },
+  { id: 'sign',         name: 'Sign',             icon: '🪧', group: 'Scenery',  unique: false, desc: 'Hole sign / marker.' },
+  { id: 'can',          name: 'Can',              icon: '🥫', group: 'Trash',    unique: false, desc: 'Trash: drink can.' },
+  { id: 'bottle',       name: 'Bottle',           icon: '🍾', group: 'Trash',    unique: false, desc: 'Trash: bottle.' },
+  { id: 'cup_trash',    name: 'Soda cup',         icon: '🥤', group: 'Trash',    unique: false, desc: 'Trash: paper soda cup.' },
+  { id: 'paper',        name: 'Paper',            icon: '📄', group: 'Trash',    unique: false, desc: 'Trash: scorecard / paper.' },
+  { id: 'banana',       name: 'Banana peel',      icon: '🍌', group: 'Trash',    unique: false, desc: 'Trash: banana peel.' },
+  { id: 'bag',          name: 'Plastic bag',      icon: '🛍️', group: 'Trash',    unique: false, desc: 'Trash: plastic bag.' },
+  { id: 'lost_ball',    name: 'Lost ball',        icon: '⚪', group: 'Trash',    unique: false, desc: 'Trash: lost golf ball.' },
+  { id: 'branch',       name: 'Branch',           icon: '🪵', group: 'Trash',    unique: false, desc: 'Fallen branch to clear.' },
+];
+const OBJ_BY_ID = Object.fromEntries(OBJECTS.map(o => [o.id, o]));
+
+const TOOLS = {
+  terrain: [['brush','✏️ Brush'],['rect','▭ Rect'],['fill','🪣 Fill'],['erase','🧽 Erase'],['pan','✋ Pan']],
+  mess:    [['brush','✏️ Brush'],['rect','▭ Rect'],['fill','🪣 Fill'],['erase','🧽 Erase'],['pan','✋ Pan']],
+  objects: [['place','➕ Place'],['move','↔ Move'],['remove','🗑 Remove'],['pan','✋ Pan']],
+};
+const BRUSHES = [0, 1, 2, 3, 5]; // radius in tiles
+
+/* ---------------- State ---------------- */
+const STORE_KEY = 'golfCourseDesigner.v1';
+let uid = 1;
+const newId = () => 'h' + Date.now().toString(36) + (uid++);
+
+function makeHole(w = 30, h = 50, starter = true) {
+  const hole = { id: newId(), name: '', par: 4, notes: '', width: w, height: h,
+    tiles: new Array(w * h).fill('R'), mess: new Array(w * h).fill('.'), objects: [] };
+  if (starter) applyStarter(hole);
+  return hole;
+}
+
+function applyStarter(hole) {
+  const { width: w, height: h } = hole;
+  hole.tiles.fill('R'); hole.mess.fill('.'); hole.objects = [];
+  const set = (x, y, ch) => { if (x >= 0 && y >= 0 && x < w && y < h) hole.tiles[y * w + x] = ch; };
+  const ellipse = (cx, cy, rx, ry, ch) => {
+    for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++)
+      for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+        const dx = (x - cx) / rx, dy = (y - cy) / ry;
+        if (dx * dx + dy * dy <= 1) set(x, y, ch);
+      }
+  };
+  // woods along the edges
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (x < 2 || x >= w - 2) set(x, y, 'X');
+  }
+  const cx = Math.floor(w / 2);
+  const teeY = h - 6, greenY = 7;
+  // fairway: gentle curve from tee to green
+  for (let y = greenY + 4; y <= teeY - 4; y++) {
+    const t = (y - greenY) / (teeY - greenY);
+    const off = Math.sin(t * Math.PI) * (w * 0.15);
+    const half = Math.max(3, Math.round(w * 0.15));
+    for (let x = Math.round(cx + off - half); x <= Math.round(cx + off + half); x++) set(x, y, 'F');
+  }
+  ellipse(cx, greenY, Math.max(3, w * 0.15), 4.5, 'G');
+  ellipse(cx - Math.max(4, w * 0.2), greenY + 3, 2.2, 1.6, 'S');
+  ellipse(cx + Math.max(5, w * 0.22), Math.round(h * 0.5), 2.6, 3.5, 'W');
+  for (let y = teeY - 1; y <= teeY + 1; y++) for (let x = cx - 2; x <= cx + 2; x++) set(x, y, 'T');
+  // a cart path on the side
+  for (let y = 3; y < h - 2; y++) set(3, y, 'P');
+  hole.objects.push({ type: 'tee', x: cx, y: teeY });
+  hole.objects.push({ type: 'cup', x: cx, y: greenY });
+  hole.objects.push({ type: 'player_start', x: 4, y: h - 3 });
+  hole.objects.push({ type: 'trash_bin', x: 4, y: h - 4 });
+}
+
+function defaultCourse() {
+  return { name: 'My Golf Course', author: '', description: '', tileYards: 8, holes: [makeHole()] };
+}
+
+let course = load() || defaultCourse();
+let current = 0;
+const ui = { mode: 'terrain', tool: { terrain: 'brush', mess: 'brush', objects: 'place' },
+  pick: { terrain: 'F', mess: 'L', objects: 'tree' }, brush: 1, grid: true };
+const history = new Map(); // holeId -> {undo:[], redo:[]}
+const view = { scale: 1, ox: 0, oy: 0 };
+
+const hole = () => course.holes[current];
+
+/* ---------------- Persistence ---------------- */
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    return normalizeCourse(JSON.parse(raw));
+  } catch (e) { return null; }
+}
+let saveTimer = 0;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(course)); } catch (e) { /* storage unavailable */ }
+  }, 300);
+}
+
+// Accepts internal format or exported format and returns internal format.
+function normalizeCourse(data) {
+  if (!data || typeof data !== 'object') throw new Error('Not a course');
+  const src = data.course && data.holes ? { ...data.course, holes: data.holes } : data;
+  if (!Array.isArray(src.holes) || !src.holes.length) throw new Error('No holes found');
+  const out = { name: String(src.name || 'Imported Course'), author: String(src.author || ''),
+    description: String(src.description || ''), tileYards: Number(src.tileYards || src.tileSizeYards) || 8, holes: [] };
+  for (const h of src.holes) {
+    const w = Math.max(1, Math.min(300, h.width | 0)), ht = Math.max(1, Math.min(300, h.height | 0));
+    const toFlat = (rows, def, valid) => {
+      const flat = new Array(w * ht).fill(def);
+      if (Array.isArray(rows) && rows.length === w * ht && typeof rows[0] === 'string' && rows[0].length === 1) {
+        rows.forEach((c, i) => { if (valid(c)) flat[i] = c; });
+      } else if (Array.isArray(rows)) {
+        rows.forEach((row, y) => { if (y < ht) for (let x = 0; x < w; x++) { const c = String(row)[x]; if (c && valid(c)) flat[y * w + x] = c; } });
+      }
+      return flat;
+    };
+    out.holes.push({ id: newId(), name: String(h.name || ''), par: Number(h.par) || 4, notes: String(h.notes || ''),
+      width: w, height: ht,
+      tiles: toFlat(h.tiles, 'R', c => !!TERRAIN_BY_CH[c]),
+      mess: toFlat(h.mess, '.', c => c === '.' || !!MESS_BY_CH[c]),
+      objects: (h.objects || []).filter(o => OBJ_BY_ID[o.type]).map(o => ({ type: o.type, x: o.x | 0, y: o.y | 0 })) });
+  }
+  return out;
+}
+
+/* ---------------- History ---------------- */
+function hist() {
+  const id = hole().id;
+  if (!history.has(id)) history.set(id, { undo: [], redo: [] });
+  return history.get(id);
+}
+function snapshot() {
+  const h = hole();
+  return { width: h.width, height: h.height, tiles: h.tiles.slice(), mess: h.mess.slice(), objects: h.objects.map(o => ({ ...o })) };
+}
+function restore(s) {
+  const h = hole();
+  h.width = s.width; h.height = s.height; h.tiles = s.tiles; h.mess = s.mess; h.objects = s.objects;
+}
+function pushUndo() {
+  const hs = hist();
+  hs.undo.push(snapshot());
+  if (hs.undo.length > 60) hs.undo.shift();
+  hs.redo.length = 0;
+}
+function undo() {
+  const hs = hist(); if (!hs.undo.length) return;
+  hs.redo.push(snapshot()); restore(hs.undo.pop()); changed();
+}
+function redo() {
+  const hs = hist(); if (!hs.redo.length) return;
+  hs.undo.push(snapshot()); restore(hs.redo.pop()); changed();
+}
+
+/* ---------------- Canvas & rendering ---------------- */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let dpr = 1, cw = 0, ch = 0;
+
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  dpr = window.devicePixelRatio || 1;
+  cw = r.width; ch = r.height;
+  canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
+  render();
+}
+
+function fit() {
+  const h = hole();
+  const pad = 16;
+  const s = Math.min((cw - pad * 2) / (h.width * TILE), (ch - pad * 2) / (h.height * TILE));
+  view.scale = Math.max(0.1, s);
+  view.ox = (cw - h.width * TILE * view.scale) / 2;
+  view.oy = (ch - h.height * TILE * view.scale) / 2;
+  render();
+}
+
+function rand(x, y, k) {
+  let n = (x * 374761393 + y * 668265263 + k * 2147483647) | 0;
+  n = (n ^ (n >>> 13)) * 1274126177 | 0;
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, Math.max(0, (n >> 16) + amt));
+  const g = Math.min(255, Math.max(0, ((n >> 8) & 255) + amt));
+  const b = Math.min(255, Math.max(0, (n & 255) + amt));
+  return `rgb(${r},${g},${b})`;
+}
+const SHADES = {};
+for (const t of TERRAIN) SHADES[t.ch] = { a: t.color, b: shade(t.color, -10), c: shade(t.color, -28), d: shade(t.color, 22) };
+
+function drawTile(c, x, y, px, py, s) {
+  const sh = SHADES[c];
+  switch (c) {
+    case 'F': case 'G': case 'T':
+      // mowing stripes
+      ctx.fillStyle = (Math.floor(x / (c === 'G' ? 1 : 2)) % 2) ? sh.a : sh.b;
+      ctx.fillRect(px, py, s, s); break;
+    case 'S':
+      ctx.fillStyle = sh.a; ctx.fillRect(px, py, s, s);
+      if (s > 6) { ctx.fillStyle = sh.b; for (let i = 0; i < 3; i++) ctx.fillRect(px + rand(x, y, i) * s, py + rand(x, y, i + 9) * s, s / 10, s / 10); }
+      break;
+    case 'W':
+      ctx.fillStyle = sh.a; ctx.fillRect(px, py, s, s);
+      if (s > 6 && rand(x, y, 3) < 0.35) { ctx.strokeStyle = sh.d; ctx.lineWidth = Math.max(1, s / 12);
+        const wy = py + s * (0.3 + rand(x, y, 4) * 0.4); ctx.beginPath(); ctx.moveTo(px + s * .2, wy);
+        ctx.quadraticCurveTo(px + s * .5, wy - s * .15, px + s * .8, wy); ctx.stroke(); }
+      break;
+    case 'X':
+      ctx.fillStyle = sh.a; ctx.fillRect(px, py, s, s);
+      if (s > 5) { ctx.fillStyle = sh.c; ctx.beginPath();
+        ctx.arc(px + s * (0.3 + rand(x, y, 1) * 0.4), py + s * (0.3 + rand(x, y, 2) * 0.4), s * 0.38, 0, 7); ctx.fill(); }
+      break;
+    case 'O':
+      ctx.fillStyle = sh.a; ctx.fillRect(px, py, s, s);
+      if (s > 5) { ctx.strokeStyle = sh.c; ctx.lineWidth = Math.max(1, s / 10); ctx.beginPath();
+        ctx.moveTo(px, py + s); ctx.lineTo(px + s, py); ctx.stroke(); }
+      break;
+    case 'R': case 'D':
+      ctx.fillStyle = sh.a; ctx.fillRect(px, py, s, s);
+      if (s > 8 && rand(x, y, 5) < (c === 'D' ? 0.6 : 0.25)) { ctx.fillStyle = sh.c;
+        ctx.fillRect(px + rand(x, y, 6) * s * .8, py + rand(x, y, 7) * s * .8, s / 8, s / 5); }
+      break;
+    default:
+      ctx.fillStyle = sh.a; ctx.fillRect(px, py, s, s);
+  }
+}
+
+function drawMess(c, x, y, px, py, s) {
+  const m = MESS_BY_CH[c]; if (!m) return;
+  ctx.fillStyle = m.color;
+  if (c === 'M') {
+    ctx.globalAlpha = 0.7; ctx.beginPath();
+    ctx.ellipse(px + s / 2, py + s / 2, s * 0.48, s * 0.4, rand(x, y, 1) * 3, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  } else if (c === 'L') {
+    for (let i = 0; i < 3; i++) { ctx.fillStyle = i === 1 ? '#b8461f' : (i === 2 ? '#e3b23c' : m.color);
+      ctx.beginPath(); ctx.ellipse(px + s * (0.2 + rand(x, y, i) * 0.6), py + s * (0.2 + rand(x, y, i + 5) * 0.6), s * 0.16, s * 0.09, rand(x, y, i + 7) * 3, 0, 7); ctx.fill(); }
+  } else if (c === 'C') {
+    ctx.lineWidth = Math.max(1, s / 14); ctx.strokeStyle = m.color;
+    for (let i = 0; i < 4; i++) { const sx = px + rand(x, y, i) * s * .8 + s * .1, sy = py + rand(x, y, i + 4) * s * .8 + s * .1;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + s * .12, sy - s * .12); ctx.stroke(); }
+  } else if (c === 'V') {
+    ctx.save(); ctx.translate(px + s / 2, py + s / 2); ctx.rotate(rand(x, y, 2) * 3);
+    ctx.fillRect(-s * .3, -s * .12, s * .6, s * .24); ctx.restore();
+  } else if (c === 'K') {
+    ctx.strokeStyle = m.color; ctx.lineWidth = Math.max(1, s / 10);
+    const bx = px + s / 2, by = py + s * .85;
+    for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + i * s * .3, py + s * .2); ctx.stroke(); }
+  }
+}
+
+function drawObject(o, s) {
+  const def = OBJ_BY_ID[o.type]; if (!def) return;
+  const px = view.ox + (o.x + 0.5) * TILE * view.scale, py = view.oy + (o.y + 0.5) * TILE * view.scale;
+  const size = Math.max(10, s * 1.05);
+  if (o.type === 'tee') {
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = Math.max(1.5, size / 14);
+    ctx.beginPath(); ctx.arc(px, py, size * 0.42, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#000'; ctx.font = `bold ${size * 0.5}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('T', px, py + size * 0.03);
+    return;
+  }
+  if (o.type === 'cup') {
+    // hole + flag
+    ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(px, py, size * 0.2, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#eee'; ctx.lineWidth = Math.max(1.5, size / 14);
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py - size * 1.1); ctx.stroke();
+    ctx.fillStyle = '#e8413a'; ctx.beginPath(); ctx.moveTo(px, py - size * 1.1); ctx.lineTo(px + size * 0.6, py - size * 0.92);
+    ctx.lineTo(px, py - size * 0.74); ctx.closePath(); ctx.fill();
+    return;
+  }
+  ctx.font = `${size * 0.85}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(def.icon, px, py + size * 0.04);
+}
+
+let preview = null; // {x0,y0,x1,y1} for rect tool, or {x,y} hover
+function render() {
+  if (!cw) return;
+  const h = hole();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#0e1612'; ctx.fillRect(0, 0, cw, ch);
+  const s = TILE * view.scale;
+  // visible range
+  const x0 = Math.max(0, Math.floor(-view.ox / s)), y0 = Math.max(0, Math.floor(-view.oy / s));
+  const x1 = Math.min(h.width - 1, Math.ceil((cw - view.ox) / s)), y1 = Math.min(h.height - 1, Math.ceil((ch - view.oy) / s));
+  const sz = s + 0.6; // overlap to hide seams
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    drawTile(h.tiles[y * h.width + x], x, y, view.ox + x * s, view.oy + y * s, sz);
+  }
+  const showMess = true;
+  if (showMess) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const m = h.mess[y * h.width + x];
+    if (m !== '.') drawMess(m, x, y, view.ox + x * s, view.oy + y * s, s);
+  }
+  if (ui.grid && s >= 7) {
+    ctx.strokeStyle = 'rgba(0,0,0,0.13)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let x = x0; x <= x1 + 1; x++) { const gx = Math.round(view.ox + x * s) + 0.5; ctx.moveTo(gx, view.oy + y0 * s); ctx.lineTo(gx, view.oy + (y1 + 1) * s); }
+    for (let y = y0; y <= y1 + 1; y++) { const gy = Math.round(view.oy + y * s) + 0.5; ctx.moveTo(view.ox + x0 * s, gy); ctx.lineTo(view.ox + (x1 + 1) * s, gy); }
+    ctx.stroke();
+  }
+  // tee-to-cup line
+  const tee = h.objects.find(o => o.type === 'tee'), cup = h.objects.find(o => o.type === 'cup');
+  if (tee && cup) {
+    ctx.setLineDash([6, 6]); ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5; ctx.beginPath();
+    ctx.moveTo(view.ox + (tee.x + .5) * s, view.oy + (tee.y + .5) * s); ctx.lineTo(view.ox + (cup.x + .5) * s, view.oy + (cup.y + .5) * s);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  // objects, sorted top to bottom so lower ones overlap
+  const objs = h.objects.slice().sort((a, b) => a.y - b.y);
+  for (const o of objs) drawObject(o, s);
+  // border
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1;
+  ctx.strokeRect(view.ox - 0.5, view.oy - 0.5, h.width * s + 1, h.height * s + 1);
+  // previews
+  if (preview && preview.rect) {
+    const r = normRect(preview.rect);
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+    ctx.fillRect(view.ox + r.x0 * s, view.oy + r.y0 * s, (r.x1 - r.x0 + 1) * s, (r.y1 - r.y0 + 1) * s);
+    ctx.strokeRect(view.ox + r.x0 * s, view.oy + r.y0 * s, (r.x1 - r.x0 + 1) * s, (r.y1 - r.y0 + 1) * s);
+  } else if (preview && preview.hover && (ui.mode !== 'objects') && ['brush', 'erase'].includes(curTool())) {
+    const r = ui.brush; ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(view.ox + (preview.x + .5) * s, view.oy + (preview.y + .5) * s, (r + 0.5) * s, 0, 7); ctx.stroke();
+  }
+}
+
+function normRect(r) {
+  return { x0: Math.min(r.x0, r.x1), y0: Math.min(r.y0, r.y1), x1: Math.max(r.x0, r.x1), y1: Math.max(r.y0, r.y1) };
+}
+
+/* ---------------- Editing ---------------- */
+const curTool = () => ui.tool[ui.mode];
+function layerAndValue(erasing) {
+  if (ui.mode === 'terrain') return ['tiles', erasing ? 'R' : ui.pick.terrain];
+  return ['mess', erasing ? '.' : ui.pick.mess];
+}
+function inBounds(x, y) { const h = hole(); return x >= 0 && y >= 0 && x < h.width && y < h.height; }
+
+function stamp(cx, cy, layer, val) {
+  const h = hole(), r = ui.brush, arr = h[layer];
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (dx * dx + dy * dy > r * r + r * 0.8) continue;
+    const x = cx + dx, y = cy + dy;
+    if (inBounds(x, y)) arr[y * h.width + x] = val;
+  }
+}
+function line(x0, y0, x1, y1, fn) {
+  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  for (;;) { fn(x0, y0); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x0 += sx; } if (e2 < dx) { err += dx; y0 += sy; } }
+}
+function floodFill(x, y, layer, val) {
+  const h = hole(), arr = h[layer], w = h.width;
+  const target = arr[y * w + x]; if (target === val) return;
+  const stack = [[x, y]];
+  while (stack.length) {
+    const [px, py] = stack.pop();
+    if (!inBounds(px, py) || arr[py * w + px] !== target) continue;
+    arr[py * w + px] = val;
+    stack.push([px + 1, py], [px - 1, py], [px, py + 1], [px, py - 1]);
+  }
+}
+function fillRect(r, layer, val) {
+  const h = hole(), n = normRect(r);
+  for (let y = Math.max(0, n.y0); y <= Math.min(h.height - 1, n.y1); y++)
+    for (let x = Math.max(0, n.x0); x <= Math.min(h.width - 1, n.x1); x++) h[layer][y * h.width + x] = val;
+}
+function objectAt(x, y) {
+  const objs = hole().objects;
+  for (let i = objs.length - 1; i >= 0; i--) if (objs[i].x === x && objs[i].y === y) return i;
+  return -1;
+}
+function placeObject(x, y, type) {
+  const h = hole(), def = OBJ_BY_ID[type];
+  if (def.unique) h.objects = h.objects.filter(o => o.type !== type);
+  const i = objectAt(x, y); if (i >= 0) h.objects.splice(i, 1);
+  h.objects.push({ type, x, y });
+}
+
+/* ---------------- Pointer input ---------------- */
+const pointers = new Map();
+let gesture = null; // {kind:'stroke'|'rect'|'pan'|'pinch'|'move', ...}
+
+function toTile(e) {
+  const r = canvas.getBoundingClientRect();
+  const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  return { sx, sy, x: Math.floor((sx - view.ox) / (TILE * view.scale)), y: Math.floor((sy - view.oy) / (TILE * view.scale)) };
+}
+
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  const p = toTile(e);
+  pointers.set(e.pointerId, p);
+  if (pointers.size === 2) {
+    // second finger: cancel any stroke in progress, start pinch
+    if (gesture && gesture.snap) { restore(gesture.snap); hist().undo.pop(); changed(false); }
+    const [a, b] = [...pointers.values()];
+    gesture = { kind: 'pinch', dist: Math.hypot(a.sx - b.sx, a.sy - b.sy), mx: (a.sx + b.sx) / 2, my: (a.sy + b.sy) / 2 };
+    preview = null; render(); return;
+  }
+  if (pointers.size > 2) return;
+  const tool = curTool();
+  if (tool === 'pan' || e.button === 1 || e.button === 2 || spaceDown) {
+    gesture = { kind: 'pan', sx: p.sx, sy: p.sy }; return;
+  }
+  if (ui.mode === 'objects') {
+    if (!inBounds(p.x, p.y)) return;
+    if (tool === 'place' || tool === 'remove') gesture = { kind: 'tap', x: p.x, y: p.y };
+    else if (tool === 'move') {
+      const i = objectAt(p.x, p.y);
+      if (i >= 0) { pushUndo(); gesture = { kind: 'move', obj: hole().objects[i], snap: hist().undo[hist().undo.length - 1] }; }
+    }
+    return;
+  }
+  const erasing = tool === 'erase';
+  const [layer, val] = layerAndValue(erasing);
+  if (tool === 'fill') { gesture = { kind: 'tap', x: p.x, y: p.y, layer, val }; return; }
+  pushUndo();
+  const snap = hist().undo[hist().undo.length - 1];
+  if (tool === 'rect') {
+    gesture = { kind: 'rect', layer, val, snap };
+    preview = { rect: { x0: p.x, y0: p.y, x1: p.x, y1: p.y } }; render(); return;
+  }
+  gesture = { kind: 'stroke', layer, val, lx: p.x, ly: p.y, snap };
+  stamp(p.x, p.y, layer, val); changed(false);
+});
+
+canvas.addEventListener('pointermove', e => {
+  const p = toTile(e);
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, p);
+  if (!gesture) {
+    if (e.pointerType === 'mouse') { preview = { hover: true, x: p.x, y: p.y }; render(); updateStatus(p); }
+    return;
+  }
+  if (gesture.kind === 'pinch' && pointers.size >= 2) {
+    const [a, b] = [...pointers.values()];
+    const dist = Math.hypot(a.sx - b.sx, a.sy - b.sy), mx = (a.sx + b.sx) / 2, my = (a.sy + b.sy) / 2;
+    zoomAt(gesture.mx, gesture.my, dist / (gesture.dist || 1));
+    view.ox += mx - gesture.mx; view.oy += my - gesture.my;
+    gesture.dist = dist; gesture.mx = mx; gesture.my = my; render(); return;
+  }
+  if (gesture.kind === 'pan') {
+    view.ox += p.sx - gesture.sx; view.oy += p.sy - gesture.sy; gesture.sx = p.sx; gesture.sy = p.sy; render(); return;
+  }
+  if (gesture.kind === 'stroke') {
+    if (p.x !== gesture.lx || p.y !== gesture.ly) {
+      line(gesture.lx, gesture.ly, p.x, p.y, (x, y) => stamp(x, y, gesture.layer, gesture.val));
+      gesture.lx = p.x; gesture.ly = p.y; changed(false);
+    }
+    if (e.pointerType === 'mouse') preview = { hover: true, x: p.x, y: p.y };
+    updateStatus(p); return;
+  }
+  if (gesture.kind === 'rect') { preview.rect.x1 = p.x; preview.rect.y1 = p.y; render(); updateStatus(p); return; }
+  if (gesture.kind === 'move' && inBounds(p.x, p.y)) {
+    gesture.obj.x = p.x; gesture.obj.y = p.y; render(); updateStatus(p);
+  }
+});
+
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (!gesture) return;
+  if (gesture.kind === 'pinch') { if (pointers.size === 0) gesture = null; else gesture = { kind: 'idle' }; return; }
+  if (pointers.size > 0) return;
+  if (gesture.kind === 'tap') runTap(gesture);
+  else if (gesture.kind === 'rect') { fillRect(preview.rect, gesture.layer, gesture.val); preview = null; changed(); }
+  else if (gesture.kind === 'move') {
+    // drop any other object sitting on the same tile
+    const o = gesture.obj, h = hole();
+    h.objects = h.objects.filter(q => q === o || q.x !== o.x || q.y !== o.y); changed();
+  }
+  else if (gesture.kind === 'stroke') changed();
+  gesture = null;
+}
+function runTap(g) {
+  if (!inBounds(g.x, g.y)) return;
+  const tool = curTool();
+  if (tool === 'fill') { pushUndo(); floodFill(g.x, g.y, g.layer, g.val); changed(); }
+  else if (tool === 'place') { pushUndo(); placeObject(g.x, g.y, ui.pick.objects); changed(); }
+  else if (tool === 'remove') { const i = objectAt(g.x, g.y); if (i >= 0) { pushUndo(); hole().objects.splice(i, 1); changed(); } }
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && !gesture) { preview = null; render(); } });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+function zoomAt(sx, sy, factor) {
+  const ns = Math.min(8, Math.max(0.1, view.scale * factor));
+  const f = ns / view.scale;
+  view.ox = sx - (sx - view.ox) * f; view.oy = sy - (sy - view.oy) * f; view.scale = ns;
+}
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = canvas.getBoundingClientRect();
+  if (e.ctrlKey || Math.abs(e.deltaY) > Math.abs(e.deltaX) && !e.shiftKey) zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.0015));
+  else { view.ox -= e.deltaX; view.oy -= e.deltaY; }
+  render();
+}, { passive: false });
+
+let spaceDown = false;
+window.addEventListener('keydown', e => {
+  if (e.target.matches('input, textarea, select')) return;
+  const k = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); return; }
+  if (e.key === ' ') { spaceDown = true; e.preventDefault(); return; }
+  const map = { b: 'brush', r: 'rect', f: 'fill', e: 'erase', h: 'pan' };
+  if (map[k] && ui.mode !== 'objects') { ui.tool[ui.mode] = map[k]; buildTools(); }
+  if (k === '[') { ui.brush = BRUSHES[Math.max(0, BRUSHES.indexOf(ui.brush) - 1)]; buildTools(); }
+  if (k === ']') { ui.brush = BRUSHES[Math.min(BRUSHES.length - 1, BRUSHES.indexOf(ui.brush) + 1)]; buildTools(); }
+  if (k === 'g') { ui.grid = !ui.grid; render(); }
+});
+window.addEventListener('keyup', e => { if (e.key === ' ') spaceDown = false; });
+
+/* ---------------- Stats & validation ---------------- */
+function holeStats(h) {
+  const tee = h.objects.find(o => o.type === 'tee'), cup = h.objects.find(o => o.type === 'cup');
+  const dist = tee && cup ? Math.hypot(tee.x - cup.x, tee.y - cup.y) : null;
+  const count = {};
+  for (const c of h.tiles) count[c] = (count[c] || 0) + 1;
+  let messTiles = 0; for (const m of h.mess) if (m !== '.') messTiles++;
+  const trash = h.objects.filter(o => OBJ_BY_ID[o.type].group === 'Trash').length;
+  return { tee, cup, distTiles: dist, yards: dist == null ? null : Math.round(dist * course.tileYards), count, messTiles, trash };
+}
+function holeWarnings(h) {
+  const st = holeStats(h), w = [];
+  if (!st.tee) w.push('No tee (ball start) placed');
+  if (!st.cup) w.push('No cup / flag placed');
+  if (st.cup && h.tiles[st.cup.y * h.width + st.cup.x] !== 'G') w.push('Cup is not on a green');
+  if (st.tee && ['W', 'O', 'X'].includes(h.tiles[st.tee.y * h.width + st.tee.x])) w.push('Tee is in water/woods/out of bounds');
+  return w;
+}
+
+/* ---------------- UI ---------------- */
+const $ = id => document.getElementById(id);
+
+function holeLabel(h, i) { return h.name ? `Hole ${i + 1}: ${h.name}` : `Hole ${i + 1}`; }
+
+function updateHeader() {
+  const h = hole(), st = holeStats(h);
+  $('holeTitle').innerHTML = '';
+  const b = document.createElement('b'); b.textContent = holeLabel(h, current);
+  const sp = document.createElement('span');
+  sp.textContent = `Par ${h.par}` + (st.yards != null ? ` · ${st.yards} yd` : '') + ` · ${current + 1}/${course.holes.length}`;
+  $('holeTitle').append(b, sp);
+  $('btnPrev').disabled = current === 0;
+  $('btnNext').disabled = current === course.holes.length - 1;
+  const hs = hist(); $('btnUndo').disabled = !hs.undo.length; $('btnRedo').disabled = !hs.redo.length;
+  const w = holeWarnings(h); $('warn').textContent = w.length ? '⚠ ' + w[0] : '';
+}
+
+function updateStatus(p) {
+  const h = hole();
+  if (!p || !inBounds(p.x, p.y)) { $('status').textContent = `${h.width}×${h.height} tiles`; return; }
+  const t = TERRAIN_BY_CH[h.tiles[p.y * h.width + p.x]], m = MESS_BY_CH[h.mess[p.y * h.width + p.x]];
+  const oi = objectAt(p.x, p.y);
+  $('status').textContent = `(${p.x}, ${p.y}) ${t.name}` + (m ? ` + ${m.name}` : '') + (oi >= 0 ? ` · ${OBJ_BY_ID[h.objects[oi].type].name}` : '');
+}
+
+function changed(full = true) {
+  render();
+  if (full) { updateHeader(); save(); }
+}
+
+function buildPalette() {
+  const pal = $('palette'); pal.innerHTML = '';
+  const add = (key, label, styleOrIcon, isIcon) => {
+    const b = document.createElement('button'); b.className = 'swatch' + (ui.pick[ui.mode] === key ? ' on' : '');
+    const i = document.createElement('i');
+    if (isIcon) { i.textContent = styleOrIcon; i.style.background = '#3a5244'; } else i.style.background = styleOrIcon;
+    b.append(i, document.createTextNode(label));
+    b.onclick = () => {
+      ui.pick[ui.mode] = key;
+      if (ui.mode === 'objects' && ui.tool.objects !== 'place') ui.tool.objects = 'place';
+      if (ui.mode !== 'objects' && ['erase', 'pan'].includes(ui.tool[ui.mode])) ui.tool[ui.mode] = 'brush';
+      buildPalette(); buildTools();
+    };
+    pal.append(b);
+  };
+  if (ui.mode === 'terrain') TERRAIN.forEach(t => add(t.ch, t.name, t.color));
+  else if (ui.mode === 'mess') MESS.forEach(m => add(m.ch, m.name, m.color));
+  else {
+    let g = null;
+    for (const o of OBJECTS) {
+      if (o.group !== g) {
+        if (g) { const s = document.createElement('div'); s.className = 'sep'; pal.append(s); }
+        const l = document.createElement('div'); l.className = 'grouplabel'; l.textContent = o.group; pal.append(l); g = o.group;
+      }
+      add(o.id, o.name.replace(' (ball start)', ''), o.icon, true);
+    }
+  }
+}
+
+function buildTools() {
+  const box = $('tools'); box.innerHTML = '';
+  for (const [id, label] of TOOLS[ui.mode]) {
+    const b = document.createElement('button'); b.textContent = label;
+    if (curTool() === id) b.className = 'on';
+    b.onclick = () => { ui.tool[ui.mode] = id; buildTools(); };
+    box.append(b);
+  }
+  if (ui.mode !== 'objects') {
+    const sp = document.createElement('div'); sp.className = 'spacer'; box.append(sp);
+    const sel = document.createElement('button');
+    sel.textContent = `Size ${ui.brush * 2 + 1}`;
+    sel.title = 'Brush size ([ and ])';
+    sel.onclick = () => { ui.brush = BRUSHES[(BRUSHES.indexOf(ui.brush) + 1) % BRUSHES.length]; buildTools(); };
+    box.append(sel);
+  }
+}
+
+document.querySelectorAll('#modeTabs button').forEach(b => b.onclick = () => {
+  ui.mode = b.dataset.mode;
+  document.querySelectorAll('#modeTabs button').forEach(x => x.classList.toggle('on', x === b));
+  buildPalette(); buildTools();
+});
+
+function goHole(i) {
+  current = Math.max(0, Math.min(course.holes.length - 1, i));
+  fit(); updateHeader(); updateStatus();
+}
+$('btnPrev').onclick = () => goHole(current - 1);
+$('btnNext').onclick = () => goHole(current + 1);
+$('btnUndo').onclick = undo;
+$('btnRedo').onclick = redo;
+$('btnFit').onclick = fit;
+$('btnGrid').onclick = () => { ui.grid = !ui.grid; render(); };
+
+/* Sheets */
+let openSheetEl = null;
+function openSheet(id) {
+  closeSheet();
+  openSheetEl = $(id); openSheetEl.classList.add('open'); $('backdrop').classList.add('open');
+}
+function closeSheet() {
+  if (openSheetEl) openSheetEl.classList.remove('open');
+  $('backdrop').classList.remove('open'); openSheetEl = null;
+}
+$('backdrop').onclick = closeSheet;
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = closeSheet);
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 1800);
+}
+function ask(msg, okLabel = 'OK') {
+  return new Promise(res => {
+    $('confirmMsg').textContent = msg; $('confirmYes').textContent = okLabel; $('confirm').classList.add('open');
+    const done = v => { $('confirm').classList.remove('open'); res(v); };
+    $('confirmYes').onclick = () => done(true); $('confirmNo').onclick = () => done(false);
+  });
+}
+
+/* Course sheet */
+function buildCourseSheet() {
+  $('cName').value = course.name; $('cAuthor').value = course.author; $('cDesc').value = course.description; $('cTile').value = course.tileYards;
+  const list = $('holeList'); list.innerHTML = '';
+  course.holes.forEach((h, i) => {
+    const st = holeStats(h);
+    const row = document.createElement('div'); row.className = 'holeitem' + (i === current ? ' on' : '');
+    const n = document.createElement('div'); n.className = 'n'; n.textContent = i + 1;
+    const meta = document.createElement('div'); meta.className = 'meta';
+    meta.textContent = h.name || `Hole ${i + 1}`;
+    const sm = document.createElement('small');
+    const warns = holeWarnings(h);
+    sm.textContent = `Par ${h.par}` + (st.yards != null ? ` · ${st.yards} yd` : '') + ` · ${st.trash} trash · ${st.messTiles} mess tiles` + (warns.length ? ' · ⚠' : '');
+    meta.append(sm);
+    const up = document.createElement('button'); up.textContent = '▲'; up.disabled = i === 0;
+    up.onclick = ev => { ev.stopPropagation(); moveHole(i, -1); };
+    const dn = document.createElement('button'); dn.textContent = '▼'; dn.disabled = i === course.holes.length - 1;
+    dn.onclick = ev => { ev.stopPropagation(); moveHole(i, 1); };
+    row.append(n, meta, up, dn);
+    row.onclick = () => { goHole(i); closeSheet(); };
+    list.append(row);
+  });
+  const lg = $('legend'); lg.innerHTML = '';
+  const item = (code, name) => { const d = document.createElement('div'); const c = document.createElement('code'); c.textContent = code; d.append(c, name); lg.append(d); };
+  TERRAIN.forEach(t => item(t.ch, t.name)); item('.', 'No mess'); MESS.forEach(m => item(m.ch, m.name + ' (mess)'));
+}
+function moveHole(i, d) {
+  const j = i + d; const hs = course.holes; [hs[i], hs[j]] = [hs[j], hs[i]];
+  if (current === i) current = j; else if (current === j) current = i;
+  save(); updateHeader(); buildCourseSheet();
+}
+$('btnMenu').onclick = () => { buildCourseSheet(); openSheet('sheetCourse'); };
+$('cName').oninput = e => { course.name = e.target.value; save(); };
+$('cAuthor').oninput = e => { course.author = e.target.value; save(); };
+$('cDesc').oninput = e => { course.description = e.target.value; save(); };
+$('cTile').oninput = e => { const v = Number(e.target.value); if (v > 0) { course.tileYards = v; save(); updateHeader(); } };
+$('btnAddHole').onclick = () => { course.holes.push(makeHole()); goHole(course.holes.length - 1); save(); closeSheet(); toast('New hole added'); };
+$('btnDupHole').onclick = () => {
+  const h = hole(); const c = JSON.parse(JSON.stringify(h)); c.id = newId(); c.name = h.name ? h.name + ' (copy)' : '';
+  course.holes.splice(current + 1, 0, c); goHole(current + 1); save(); closeSheet(); toast('Hole duplicated');
+};
+$('btnReset').onclick = async () => {
+  if (!await ask('Start a brand-new course? This replaces everything saved in this browser. Copy your JSON first if you want to keep it.', 'Start over')) return;
+  course = defaultCourse(); history.clear(); goHole(0); save(); closeSheet();
+};
+$('btnImport').onclick = () => { $('importText').value = ''; openSheet('sheetImport'); };
+$('btnPickFile').onclick = () => $('fileInput').click();
+$('fileInput').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  importText(await f.text()); e.target.value = '';
+};
+$('btnDoImport').onclick = () => importText($('importText').value);
+async function importText(text) {
+  try {
+    const m = text.match(/```(?:json)?\s*([\s\S]*?)```/); // pasted Claude message
+    const raw = m ? m[1] : text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1);
+    const c = normalizeCourse(JSON.parse(raw));
+    if (!await ask(`Import "${c.name}" with ${c.holes.length} hole(s)? This replaces the current course.`, 'Import')) return;
+    course = c; history.clear(); goHole(0); save(); closeSheet(); toast('Course imported');
+  } catch (err) { toast('Could not read that JSON'); }
+}
+const inFrame = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+if (inFrame) $('btnDownload').style.display = 'none';
+$('btnDownload').onclick = () => {
+  const blob = new Blob([exportJson('all')], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = (course.name || 'course').replace(/[^\w-]+/g, '_') + '.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+
+/* Hole sheet */
+function buildHoleSheet() {
+  const h = hole();
+  $('hName').value = h.name; $('hPar').value = String(h.par); $('hNotes').value = h.notes;
+  $('hW').value = h.width; $('hH').value = h.height;
+  $('sizeNote').textContent = `At ${course.tileYards} yards per tile this hole is ${h.width * course.tileYards} × ${h.height * course.tileYards} yards. Resizing keeps the top-left corner.`;
+}
+$('btnHole').onclick = () => { buildHoleSheet(); openSheet('sheetHole'); };
+$('hName').oninput = e => { hole().name = e.target.value; save(); updateHeader(); };
+$('hPar').onchange = e => { hole().par = Number(e.target.value); save(); updateHeader(); };
+$('hNotes').oninput = e => { hole().notes = e.target.value; save(); };
+$('btnResize').onclick = () => {
+  const w = Math.max(8, Math.min(200, $('hW').value | 0)), hh = Math.max(8, Math.min(200, $('hH').value | 0));
+  const h = hole(); if (w === h.width && hh === h.height) return;
+  pushUndo();
+  const nt = new Array(w * hh).fill('R'), nm = new Array(w * hh).fill('.');
+  for (let y = 0; y < Math.min(hh, h.height); y++) for (let x = 0; x < Math.min(w, h.width); x++) {
+    nt[y * w + x] = h.tiles[y * h.width + x]; nm[y * w + x] = h.mess[y * h.width + x];
+  }
+  h.tiles = nt; h.mess = nm; h.width = w; h.height = hh;
+  h.objects = h.objects.filter(o => o.x < w && o.y < hh);
+  fit(); changed(); buildHoleSheet(); toast('Hole resized');
+};
+$('btnStarter').onclick = async () => {
+  if (!await ask('Replace this hole with the starter layout? (You can undo.)', 'Replace')) return;
+  pushUndo(); applyStarter(hole()); changed(); closeSheet();
+};
+$('btnClear').onclick = async () => {
+  if (!await ask('Clear this hole to plain rough? (You can undo.)', 'Clear')) return;
+  pushUndo(); const h = hole(); h.tiles.fill('R'); h.mess.fill('.'); h.objects = []; changed(); closeSheet();
+};
+$('btnDeleteHole').onclick = async () => {
+  if (course.holes.length === 1) { toast('A course needs at least one hole'); return; }
+  if (!await ask(`Delete ${holeLabel(hole(), current)}? This can't be undone.`, 'Delete')) return;
+  history.delete(hole().id); course.holes.splice(current, 1); goHole(Math.min(current, course.holes.length - 1)); save(); closeSheet();
+};
+
+/* ---------------- Export ---------------- */
+function exportData(scope) {
+  const holes = scope === 'current' ? [[hole(), current]] : course.holes.map((h, i) => [h, i]);
+  return {
+    format: 'golf-course-designer',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    course: { name: course.name, designer: course.author, description: course.description, tileSizeYards: course.tileYards },
+    coordinates: 'Grid of tiles seen from above, north is up. x = column (0 = left edge), y = row (0 = top edge). "tiles" and "mess" list rows from top to bottom; each character is one tile.',
+    legend: {
+      tiles: Object.fromEntries(TERRAIN.map(t => [t.ch, t.id])),
+      mess: Object.fromEntries([['.', 'none'], ...MESS.map(m => [m.ch, m.id])]),
+      objects: Object.fromEntries(OBJECTS.map(o => [o.id, `${o.group}: ${o.desc}`])),
+    },
+    holes: holes.map(([h, i]) => {
+      const st = holeStats(h), rows = [], mrows = [];
+      for (let y = 0; y < h.height; y++) {
+        rows.push(h.tiles.slice(y * h.width, (y + 1) * h.width).join(''));
+        mrows.push(h.mess.slice(y * h.width, (y + 1) * h.width).join(''));
+      }
+      const hasMess = h.mess.some(m => m !== '.');
+      return {
+        number: i + 1, name: h.name || `Hole ${i + 1}`, par: h.par, notes: h.notes,
+        width: h.width, height: h.height,
+        stats: { teeToCupTiles: st.distTiles == null ? null : +st.distTiles.toFixed(1), teeToCupYards: st.yards,
+          trashObjects: st.trash, messTiles: st.messTiles },
+        tiles: rows,
+        mess: hasMess ? mrows : [],
+        objects: h.objects.slice().sort((a, b) => a.y - b.y || a.x - b.x).map(o => ({ type: o.type, x: o.x, y: o.y })),
+      };
+    }),
+  };
+}
+function exportJson(scope) {
+  return JSON.stringify(exportData(scope), null, 2)
+    .replace(/\{\n\s+("type": "[^"]+"),\n\s+("x": -?\d+),\n\s+("y": -?\d+)\n\s+\}/g, '{ $1, $2, $3 }');
+}
+function exportPrompt(scope) {
+  const d = exportData(scope);
+  const n = d.holes.length;
+  return [
+    `I designed ${n === 1 ? 'a golf hole' : `a ${n}-hole golf course`} ("${course.name}") for my golf course cleaning game using my Golf Course Designer tool. Please convert ${n === 1 ? 'it into a level' : 'each hole into a level'} for the game.`,
+    '',
+    'How to read the design:',
+    '- Each hole is a top-down tile grid. x = column (0 = left), y = row (0 = top). North is up.',
+    `- One tile = ${course.tileYards} yards. Scale this to whatever unit the game uses.`,
+    '- "tiles" is the ground layer, one string per row, one character per tile:',
+    '  ' + TERRAIN.map(t => `${t.ch}=${t.id}`).join(', '),
+    '- "mess" is the dirt layer the player cleans up, same grid ("." = clean). Empty list = no mess:',
+    '  ' + MESS.map(m => `${m.ch}=${m.id}`).join(', '),
+    '- "objects" are things placed on a tile: tee = where the ball starts, cup = the hole/flag, player_start = where the cleaner spawns, trash_bin = trash drop-off. Scenery (tree, pine, bush, flowers, rock, bench, sign) is decoration/obstacles. Trash (can, bottle, cup_trash, paper, banana, bag, lost_ball, branch) is pickups to collect.',
+    '- "notes" are my instructions for that hole, follow them if present.',
+    '',
+    'Please look at how levels are built in this project first, map each tile/mess/object type to the closest thing the game already has (tell me about anything that has no match and suggest how to add it), then create the levels. Tell me what you made when done.',
+    '',
+    '```json',
+    exportJson(scope),
+    '```',
+  ].join('\n');
+}
+function buildSendSheet() {
+  const scope = $('exportScope').value;
+  const holes = scope === 'current' ? [[hole(), current]] : course.holes.map((h, i) => [h, i]);
+  const ul = $('checks'); ul.innerHTML = '';
+  let issues = 0;
+  for (const [h, i] of holes) for (const w of holeWarnings(h)) {
+    const li = document.createElement('li'); li.className = 'bad'; li.textContent = `⚠ ${holeLabel(h, i)}: ${w}`; ul.append(li); issues++;
+  }
+  if (!issues) { const li = document.createElement('li'); li.className = 'ok'; li.textContent = '✓ Every hole has a tee and a cup on the green'; ul.append(li); }
+  $('exportText').value = exportPrompt(scope);
+}
+$('btnSend').onclick = () => { buildSendSheet(); openSheet('sheetSend'); };
+$('exportScope').onchange = buildSendSheet;
+async function copy(text, label) {
+  try { await navigator.clipboard.writeText(text); toast(label); }
+  catch (e) {
+    const ta = $('exportText'); ta.value = text; ta.focus(); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch (_) {}
+    toast(ok ? label : 'Select the text and copy it by hand');
+  }
+}
+$('btnCopyPrompt').onclick = () => copy(exportPrompt($('exportScope').value), 'Copied, now paste it into Claude');
+$('btnCopyJson').onclick = () => copy(exportJson($('exportScope').value), 'JSON copied');
+
+/* ---------------- Init ---------------- */
+window.addEventListener('resize', () => { resize(); });
+buildPalette(); buildTools();
+resize(); fit(); updateHeader(); updateStatus();
+})();
+</script>
+</body>
+</html>
