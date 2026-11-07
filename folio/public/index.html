@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Folio</title>
+  <meta name="theme-color" content="#f7f5f0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#161513" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Folio">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=Inter+Tight:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <a href="#/" class="wordmark">Folio</a>
+    <a href="#/new" class="new-link" aria-label="Add something new">New</a>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <!-- Library -->
+  <template id="tpl-library">
+    <section class="library">
+      <label class="search">
+        <span class="visually-hidden">Search your library</span>
+        <input type="search" name="q" placeholder="Search your library" autocomplete="off" enterkeyhint="search">
+      </label>
+      <ol class="entries" aria-live="polite"></ol>
+      <div class="empty" hidden>
+        <p class="empty-title">Nothing here yet.</p>
+        <p>Paste a link to an article, video or paper, or name a topic you want to understand.</p>
+        <a href="#/new" class="button">Add your first</a>
+      </div>
+    </section>
+  </template>
+
+  <!-- New -->
+  <template id="tpl-new">
+    <section class="compose">
+      <form class="step step-input">
+        <h1 class="page-title">What do you want to learn?</h1>
+        <label>
+          <span class="visually-hidden">Link or topic</span>
+          <textarea name="input" rows="3" required maxlength="2000"
+            placeholder="Paste a link, or name a topic — e.g. “how vaccines train the immune system”"></textarea>
+        </label>
+        <button type="submit" class="button">Continue</button>
+      </form>
+
+      <div class="step step-mode" hidden>
+        <p class="kicker source-preview"></p>
+        <h1 class="page-title">How would you like it?</h1>
+        <div class="modes">
+          <button type="button" class="mode" data-mode="summary">
+            <span class="mode-name">Summary</span>
+            <span class="mode-desc">The essentials, written clearly. Key takeaways and the ideas that matter.</span>
+          </button>
+          <button type="button" class="mode" data-mode="tutor">
+            <span class="mode-name">Tutor</span>
+            <span class="mode-desc">A guided path to learn it yourself. What to study, in what order, and how to practice.</span>
+          </button>
+        </div>
+        <button type="button" class="text-button back">Back</button>
+        <p class="form-error" role="alert" hidden></p>
+      </div>
+    </section>
+  </template>
+
+  <!-- Article -->
+  <template id="tpl-article">
+    <article class="reader">
+      <figure class="cover" hidden><img alt="" referrerpolicy="no-referrer"></figure>
+      <p class="kicker"></p>
+      <h1 class="title"></h1>
+      <p class="dek"></p>
+      <div class="status" hidden></div>
+      <div class="prose"></div>
+      <footer class="article-foot" hidden>
+        <a class="source-link" target="_blank" rel="noopener noreferrer">View original</a>
+        <button type="button" class="text-button delete">Delete</button>
+      </footer>
+    </article>
+  </template>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
